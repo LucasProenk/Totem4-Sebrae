@@ -349,8 +349,8 @@ MonoBehaviour:
   quantidade: 50
   velocidadeMin: 0.8
   velocidadeMax: 1.8
-  tamanhoMin: 0.04
-  tamanhoMax: 0.14
+  tamanhoMin: 0.02
+  tamanhoMax: 0.04
   espalhamentoCanto: 0.5
   espalhamentoLateral: 0.6
   obstaculos: []
