@@ -409,15 +409,24 @@ MonoBehaviour:
   teclaAmarelo: 51
   teclaAzul: 52
   usarBotoesFisicos: 1
+  somInicio: {fileID: 8300000, guid: 1192ad2c9dfcef149b111fb6e985173d, type: 3}
+  somVerde: {fileID: 8300000, guid: 2f9aa6c9f66a18f4fb0eeacbd358f666, type: 3}
+  somVermelho: {fileID: 8300000, guid: ff1159a1574ecdb43949cdf33d493130, type: 3}
+  somAmarelo: {fileID: 8300000, guid: 7ffea88ba7e82b04584aa0f74a1e3eaa, type: 3}
+  somAzul: {fileID: 8300000, guid: 7113ba3310664494b982581ea83afcac, type: 3}
+  volumeSomBotoes: 0.75
+  somErro: {fileID: 8300000, guid: 72014fe2928e3e647a94f06ca42561ad, type: 3}
   duracaoContagem: 5
   tempoMostrandoCor: 0.8
   tempoEntreCores: 0.35
   pausaEntreRodadas: 0.8
+  tempoLimiteInput: 5
   reducaoPorAcerto: 0.02
   tempoMinimoMostrandoCor: 0.3
   tempoMinimoEntreCores: 0.15
   duracaoFade: 0.6
-  corFade: {r: 0, g: 0, b: 0, a: 1}
+  vezesPiscarErro: 4
+  duracaoPiscaErro: 0.2
   posicaoPlacar: {x: 0, y: 0}
   tamanhoPlacar: 0.12
   larguraMaximaPlacar: 1.1
@@ -549,8 +558,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9afdcaa56a26421428976e4b94b99a52, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  portaSerial: COM3
+  portaPreferida: 
   baudRate: 9600
+  timeoutHandshakeMs: 400
+  intervaloReconexao: 3
 --- !u!4 &1863557634
 Transform:
   m_ObjectHideFlags: 0

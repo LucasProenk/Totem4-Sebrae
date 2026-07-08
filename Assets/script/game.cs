@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 public class game : MonoBehaviour
 {
@@ -23,14 +22,35 @@ public class game : MonoBehaviour
     [SerializeField] private KeyCode teclaAzul = KeyCode.Alpha4;
 
     [Header("Integração com Teensy (botões físicos)")]
-    [Tooltip("Liga a escuta dos eventos do TeensyButtonManager. O LED acende sozinho no hardware ao apertar (feedback local do Teensy) — aqui só recebemos o clique pra validar a sequência do jogo.")]
+    [Tooltip("Liga a escuta dos eventos do TeensyButtonManager e o controle dos LEDs físicos durante a exibição da sequência.")]
     [SerializeField] private bool usarBotoesFisicos = true;
+
+    [Header("Som quando a contagem chega em 3")]
+    [Tooltip("Arraste aqui o áudio que toca quando o número da contagem chega em 3")]
+    [SerializeField] private AudioClip somInicio;
+
+    [Header("Som de cada cor (toca só durante a exibição da sequência)")]
+    [Tooltip("Arraste aqui o áudio que toca quando o botão VERDE acende na sequência")]
+    [SerializeField] private AudioClip somVerde;
+    [Tooltip("Arraste aqui o áudio que toca quando o botão VERMELHO acende na sequência")]
+    [SerializeField] private AudioClip somVermelho;
+    [Tooltip("Arraste aqui o áudio que toca quando o botão AMARELO acende na sequência")]
+    [SerializeField] private AudioClip somAmarelo;
+    [Tooltip("Arraste aqui o áudio que toca quando o botão AZUL acende na sequência")]
+    [SerializeField] private AudioClip somAzul;
+    [Tooltip("Volume dos sons de cor (1 = volume normal do clipe, 0.75 = 25% mais baixo)")]
+    [Range(0f, 1f)]
+    [SerializeField] private float volumeSomBotoes = 0.75f;
+    [Tooltip("Arraste aqui o áudio que toca quando o jogador erra (ou fica parado sem clicar)")]
+    [SerializeField] private AudioClip somErro;
 
     [Header("Tempos (segundos)")]
     [SerializeField] private int duracaoContagem = 5;
     [SerializeField] private float tempoMostrandoCor = 0.8f;
     [SerializeField] private float tempoEntreCores = 0.35f;
     [SerializeField] private float pausaEntreRodadas = 0.8f;
+    [Tooltip("Se o jogador ficar esse tempo sem apertar nenhum botão, conta como erro (igual apertar o botão errado).")]
+    [SerializeField] private float tempoLimiteInput = 5f;
 
     [Header("Velocidade progressiva (fica mais rápido a cada acerto)")]
     [SerializeField] private float reducaoPorAcerto = 0.02f;
@@ -39,7 +59,11 @@ public class game : MonoBehaviour
 
     [Header("Fade ao errar")]
     [SerializeField] private float duracaoFade = 0.6f;
-    [SerializeField] private Color corFade = Color.black;
+
+    [Header("Pisca dos botões ao errar")]
+    [SerializeField] private int vezesPiscarErro = 4;
+    [Tooltip("Tempo (segundos) que cada botão fica aceso ou apagado em cada pisca — não é o ciclo completo.")]
+    [SerializeField] private float duracaoPiscaErro = 0.2f;
 
     [Header("Posição da bola (unidades de mundo, iguais às do fundo/IconePlay — não é fração de tela)")]
     [Tooltip("Esse texto é criado em tempo de execução, então não dá pra arrastar no Scene view. Ajuste os valores aqui e aperte Play pra conferir. (0,0) é o centro da bola no meio do fundo.")]
@@ -62,16 +86,18 @@ public class game : MonoBehaviour
 
     private Dictionary<KeyCode, Cor> teclas;
     private Dictionary<Cor, (string nome, Color cor)> categorias;
+    private Dictionary<Cor, AudioClip> sons;
     private int indiceVermelho;
 
     private Font fonte;
     private TextMesh txtPlacar; // mostra a contagem regressiva no início e, depois, os acertos
-    private SpriteRenderer overlayFade;
+    private AudioSource audioSource;
 
     private readonly List<Cor> sequencia = new List<Cor>();
     private int acertos;
     private int indiceEsperado;
     private bool aceitandoInput;
+    private float tempoDesdeUltimoInput;
 
     private void Start()
     {
@@ -94,11 +120,24 @@ public class game : MonoBehaviour
             { Cor.Azul, ("DESCANSO", corAzul) },
         };
 
+        sons = new Dictionary<Cor, AudioClip>
+        {
+            { Cor.Verde, somVerde },
+            { Cor.Vermelho, somVermelho },
+            { Cor.Amarelo, somAmarelo },
+            { Cor.Azul, somAzul },
+        };
+
+        audioSource = GetComponent<AudioSource>();
+        if (audioSource == null)
+            audioSource = gameObject.AddComponent<AudioSource>();
+
         if (usarBotoesFisicos)
         {
             if (TeensyButtonManager.Instance != null)
             {
                 TeensyButtonManager.Instance.OnButtonDown += TratarBotaoFisico;
+                TeensyButtonManager.Instance.ApagarTodosLeds(); // garante que nada ficou aceso de uma partida anterior
             }
             else
             {
@@ -157,6 +196,19 @@ public class game : MonoBehaviour
         }
     }
 
+    // Caminho inverso do ConverterCorBotao, usado pra acender o LED certo durante a exibição da sequência
+    private CorBotao ConverterCorParaBotao(Cor cor)
+    {
+        switch (cor)
+        {
+            case Cor.Verde: return CorBotao.Verde;
+            case Cor.Vermelho: return CorBotao.Vermelho;
+            case Cor.Amarelo: return CorBotao.Amarelo;
+            case Cor.Azul: return CorBotao.Azul;
+            default: return CorBotao.Verde;
+        }
+    }
+
     private IEnumerator RodarJogo()
     {
         yield return StartCoroutine(ContagemRegressiva());
@@ -184,13 +236,43 @@ public class game : MonoBehaviour
         txtPalavra.text = "SIGA A SEQUÊNCIA DE CORES";
         txtPalavra.color = Color.white;
 
+        bool controlaLeds = usarBotoesFisicos && TeensyButtonManager.Instance != null;
+
+        if (!controlaLeds)
+        {
+            Debug.LogWarning("game: não vou controlar os LEDs na contagem porque usarBotoesFisicos=" + usarBotoesFisicos +
+                " e TeensyButtonManager.Instance=" + (TeensyButtonManager.Instance == null ? "null" : "existe"));
+        }
+
+        // Acende os 4 botões durante toda a contagem, como um "se preparar"
+        if (controlaLeds)
+        {
+            TeensyButtonManager.Instance.SetLed(CorBotao.Verde, true);
+            TeensyButtonManager.Instance.SetLed(CorBotao.Vermelho, true);
+            TeensyButtonManager.Instance.SetLed(CorBotao.Amarelo, true);
+            TeensyButtonManager.Instance.SetLed(CorBotao.Azul, true);
+        }
+
         for (int i = duracaoContagem; i >= 1; i--)
         {
             DefinirTextoPlacar(i.ToString());
+
+            // Toca o som de início assim que a contagem chega em 3
+            if (i == 3 && somInicio != null)
+                audioSource.PlayOneShot(somInicio);
+
+            if (controlaLeds && i == 1)
+                TeensyButtonManager.Instance.ApagarTodosLeds();
+
             yield return new WaitForSeconds(1f);
         }
         DefinirTextoPlacar("VAI!");
         yield return new WaitForSeconds(0.5f);
+
+        // Segurança: garante que está tudo apagado antes da primeira sequência,
+        // mesmo se "duracaoContagem" for menor que 4
+        if (controlaLeds)
+            TeensyButtonManager.Instance.ApagarTodosLeds();
 
         txtPalavra.text = "";
     }
@@ -198,6 +280,8 @@ public class game : MonoBehaviour
     private IEnumerator MostrarSequencia()
     {
         aceitandoInput = false;
+
+        bool controlaLeds = usarBotoesFisicos && TeensyButtonManager.Instance != null;
 
         float reducao = acertos * reducaoPorAcerto;
         float tempoMostrar = Mathf.Max(tempoMinimoMostrandoCor, tempoMostrandoCor - reducao);
@@ -209,11 +293,27 @@ public class game : MonoBehaviour
             txtPalavra.text = cor == Cor.Vermelho ? ProximaPalavraVermelho() : nome;
             txtPalavra.color = corCategoria;
 
+            if (controlaLeds)
+                TeensyButtonManager.Instance.SetLed(ConverterCorParaBotao(cor), true);
+
+            TocarSomDaCor(cor);
+
             yield return new WaitForSeconds(tempoMostrar);
 
             txtPalavra.text = "";
+
+            if (controlaLeds)
+                TeensyButtonManager.Instance.SetLed(ConverterCorParaBotao(cor), false);
+
             yield return new WaitForSeconds(tempoEntre);
         }
+    }
+
+    // Toca o som daquela cor, se tiver algum clip arrastado no Inspector pra ela
+    private void TocarSomDaCor(Cor cor)
+    {
+        if (sons.TryGetValue(cor, out AudioClip clip) && clip != null)
+            audioSource.PlayOneShot(clip, volumeSomBotoes);
     }
 
     // Nunca deixa repetir a mesma cor da rodada anterior, pra sequência não empacar/repetir seguido
@@ -240,9 +340,21 @@ public class game : MonoBehaviour
     {
         indiceEsperado = 0;
         aceitandoInput = true;
+        tempoDesdeUltimoInput = 0f;
 
         while (aceitandoInput && indiceEsperado < sequencia.Count)
+        {
+            tempoDesdeUltimoInput += Time.deltaTime;
+
+            if (tempoDesdeUltimoInput >= tempoLimiteInput)
+            {
+                aceitandoInput = false;
+                StartCoroutine(ErroEIrParaFraseFinal());
+                yield break;
+            }
+
             yield return null;
+        }
     }
 
     private void ReceberInput(Cor corDigitada)
@@ -252,6 +364,7 @@ public class game : MonoBehaviour
             acertos++;
             AtualizarPlacar();
             indiceEsperado++;
+            tempoDesdeUltimoInput = 0f; // reinicia a contagem do tempo limite a cada acerto
         }
         else
         {
@@ -278,16 +391,48 @@ public class game : MonoBehaviour
 
     private IEnumerator ErroEIrParaFraseFinal()
     {
-        float tempoDecorrido = 0f;
-        while (tempoDecorrido < duracaoFade)
-        {
-            tempoDecorrido += Time.deltaTime;
-            overlayFade.color = new Color(corFade.r, corFade.g, corFade.b, Mathf.Clamp01(tempoDecorrido / duracaoFade));
-            yield return null;
-        }
-        overlayFade.color = corFade;
+        bool controlaLeds = usarBotoesFisicos && TeensyButtonManager.Instance != null;
 
-        SceneManager.LoadScene(cenaFraseFinal);
+        if (somErro != null)
+            audioSource.PlayOneShot(somErro);
+
+        // Começa a escurecer a tela e faz os 4 botões piscarem ao mesmo tempo
+        FadeController.Instance.FadeToBlack(duracaoFade);
+
+        if (controlaLeds)
+            yield return StartCoroutine(PiscarTodosOsBotoes(vezesPiscarErro, duracaoPiscaErro));
+
+        // Garante que a tela já terminou de escurecer, caso o pisca termine antes do fade
+        float duracaoPisca = controlaLeds ? vezesPiscarErro * duracaoPiscaErro * 2f : 0f;
+        float tempoRestante = duracaoFade - duracaoPisca;
+        if (tempoRestante > 0f)
+            yield return new WaitForSeconds(tempoRestante);
+
+        if (controlaLeds)
+            TeensyButtonManager.Instance.ApagarTodosLeds();
+
+        // Tela já está preta aqui, então só troca de cena e revela do outro lado
+        FadeController.Instance.TrocarCena(cenaFraseFinal, 0f, duracaoFade);
+    }
+
+    // Pisca os 4 botões físicos ao mesmo tempo, "vezes" vezes (acende/apaga = 1 pisca)
+    private IEnumerator PiscarTodosOsBotoes(int vezes, float duracaoMeioCiclo)
+    {
+        for (int i = 0; i < vezes; i++)
+        {
+            DefinirLedsTodos(true);
+            yield return new WaitForSeconds(duracaoMeioCiclo);
+            DefinirLedsTodos(false);
+            yield return new WaitForSeconds(duracaoMeioCiclo);
+        }
+    }
+
+    private void DefinirLedsTodos(bool ligado)
+    {
+        TeensyButtonManager.Instance.SetLed(CorBotao.Verde, ligado);
+        TeensyButtonManager.Instance.SetLed(CorBotao.Vermelho, ligado);
+        TeensyButtonManager.Instance.SetLed(CorBotao.Amarelo, ligado);
+        TeensyButtonManager.Instance.SetLed(CorBotao.Azul, ligado);
     }
 
     // Tudo aqui é criado em espaço de mundo comum (sem rotação própria), igual ao Background/IconePlay —
@@ -299,7 +444,6 @@ public class game : MonoBehaviour
             fonte = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
         txtPlacar = CriarTexto("Placar", posicaoPlacar, tamanhoPlacar, new Color(1f, 0.85f, 0.35f));
-        CriarOverlayFade();
     }
 
     private TextMesh CriarTexto(string nomeObjeto, Vector2 posicaoMundo, float tamanhoCaractere, Color cor)
@@ -323,31 +467,5 @@ public class game : MonoBehaviour
         mr.material = tm.font.material;
 
         return tm;
-    }
-
-    // Retângulo do tamanho exato do que a câmera enxerga — cobre a tela inteira mesmo girada
-    private void CriarOverlayFade()
-    {
-        var go = new GameObject("OverlayFade");
-        go.transform.SetParent(transform, false);
-        go.transform.localPosition = Vector3.zero;
-
-        overlayFade = go.AddComponent<SpriteRenderer>();
-        overlayFade.sprite = CriarSpriteSolido();
-        overlayFade.color = new Color(corFade.r, corFade.g, corFade.b, 0f);
-        overlayFade.sortingOrder = 100;
-
-        Camera cam = Camera.main;
-        float largura = cam.orthographicSize * 2f;
-        float altura = cam.orthographicSize * 2f * cam.aspect;
-        go.transform.localScale = new Vector3(largura, altura, 1f);
-    }
-
-    private Sprite CriarSpriteSolido()
-    {
-        var tex = new Texture2D(2, 2);
-        tex.SetPixels(new[] { Color.white, Color.white, Color.white, Color.white });
-        tex.Apply();
-        return Sprite.Create(tex, new Rect(0, 0, 2, 2), new Vector2(0.5f, 0.5f), 2f);
     }
 }

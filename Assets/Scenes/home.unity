@@ -388,8 +388,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9afdcaa56a26421428976e4b94b99a52, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  portaSerial: COM3
+  portaPreferida: 
   baudRate: 9600
+  timeoutHandshakeMs: 400
+  intervaloReconexao: 3
 --- !u!4 &763285989
 Transform:
   m_ObjectHideFlags: 0
@@ -431,8 +433,8 @@ Transform:
   m_GameObject: {fileID: 800000001}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.598, y: 0.598, z: 1}
+  m_LocalPosition: {x: 0.0003, y: 0.0181, z: 0}
+  m_LocalScale: {x: 0.5213202, y: 0.5228352, z: 0.9247}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -478,7 +480,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: -10
-  m_Sprite: {fileID: 21300000, guid: f174d7f8988f6c742a514bebf6c7a96c, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 5ed43d9d8124175408f7a01a4ddf0ac6, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -597,10 +599,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   raio: 0.32
-  cor: {r: 1, g: 0.85, b: 0.35, a: 0.27450982}
+  cor: {r: 0.18723106, g: 1, b: 0, a: 0.09803922}
   velocidadePiscar: 2.5
   alphaMin: 0.15
-  alphaMax: 0.95
+  alphaMax: 0.44
   escalaMin: 0.9
   escalaMax: 1.15
 --- !u!1 &800000040
@@ -727,6 +729,55 @@ BoxCollider2D:
   serializedVersion: 2
   m_Size: {x: 4.342416, y: 1.2693741}
   m_EdgeRadius: 0
+--- !u!1 &1124752592
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1124752594}
+  - component: {fileID: 1124752593}
+  m_Layer: 0
+  m_Name: botaostart
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1124752593
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1124752592}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ed48e4a5cbcb1b540a22d00d1ca20519, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  cenaDoJogo: telajogo
+  duracaoFade: 0.6
+  teclaDeTeste: 49
+  usarBotoesFisicos: 1
+  somIniciar: {fileID: 8300000, guid: 5da6f9c2fd7632b4d942c885edfffc9f, type: 3}
+--- !u!4 &1124752594
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1124752592}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1.180685, y: -0.7679189, z: 0.054541033}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1436628267
 GameObject:
   m_ObjectHideFlags: 0
@@ -943,3 +994,4 @@ SceneRoots:
   - {fileID: 559872759}
   - {fileID: 800000041}
   - {fileID: 763285989}
+  - {fileID: 1124752594}

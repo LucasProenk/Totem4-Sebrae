@@ -3,13 +3,21 @@
   TeensyButtonManager.cs
 
   Responsavel por:
-  - Abrir a porta serial com o Teensy
+  - Achar e abrir a porta serial do Teensy sozinho (nao importa em qual USB do PC ele for plugado)
   - Ler os eventos "BTN,COR,DOWN" / "BTN,COR,UP" e disparar eventos C#
   - Enviar comandos "LED,COR,ON" / "LED,COR,OFF" / "LED,ALL,OFF" pro Teensy
 
+  Como a autodeteccao funciona:
+  - O script varre todas as portas seriais disponiveis no PC
+  - Pra cada uma, manda "PING" e espera a resposta "PONG"
+  - So considera "achei o Teensy" quando recebe o PONG certo (assim nao confunde
+    com mouse/modem/outro dispositivo serial que porventura esteja plugado)
+  - Se a conexao cair (desplugou o cabo), ele tenta reconectar sozinho de tempos em tempos
+
   Como usar:
   1) Arraste este script pra um GameObject vazio na cena (ex: "TeensyManager")
-  2) Ajuste o campo "Porta Serial" no Inspector (ex: COM3 no Windows)
+  2) Nao precisa mexer em nada no Inspector — ele acha a porta sozinho
+     (o campo "Porta Preferida" e opcional, so use se quiser forcar uma porta especifica)
   3) Em outro script (a logica do jogo), inscreva-se nos eventos:
 
      void OnEnable() {
@@ -27,6 +35,7 @@
 */
 
 using System;
+using System.Collections;
 using System.IO.Ports;
 using UnityEngine;
 
@@ -36,13 +45,18 @@ public class TeensyButtonManager : MonoBehaviour
 {
     public static TeensyButtonManager Instance { get; private set; }
 
-    [Header("Configuracao da Serial")]
-    [Tooltip("Porta serial do Teensy. No Windows costuma ser algo como COM3, COM4...")]
-    public string portaSerial = "COM3";
+    [Header("Conexao automatica (USB)")]
+    [Tooltip("Deixe em branco: o script procura o Teensy sozinho em qualquer porta USB. So preencha (ex: COM3) se quiser forcar uma porta especifica.")]
+    public string portaPreferida = "";
     public int baudRate = 9600;
+    [Tooltip("Quanto tempo (ms) esperar a resposta 'PONG' de cada porta testada")]
+    public int timeoutHandshakeMs = 400;
+    [Tooltip("Segundos entre tentativas de reconexao quando o Teensy nao esta conectado")]
+    public float intervaloReconexao = 3f;
 
     private SerialPort porta;
     private bool conectado = false;
+    private string bufferLeitura = "";
 
     // Eventos que a logica do jogo vai escutar
     public event Action<CorBotao> OnButtonDown;
@@ -61,24 +75,79 @@ public class TeensyButtonManager : MonoBehaviour
 
     private void Start()
     {
-        AbrirConexao();
+        StartCoroutine(ManterConexao());
     }
 
-    private void AbrirConexao()
+    // Fica de olho na conexao a vida toda: tenta conectar se estiver desconectado,
+    // e da um tempo entre tentativas pra nao travar o jogo nem floodar a varredura de portas
+    private IEnumerator ManterConexao()
     {
+        while (true)
+        {
+            if (!conectado)
+            {
+                TentarConectar();
+            }
+            yield return new WaitForSeconds(conectado ? 1f : intervaloReconexao);
+        }
+    }
+
+    private void TentarConectar()
+    {
+        // Se preencheu uma porta especifica no Inspector, tenta ela primeiro
+        if (!string.IsNullOrEmpty(portaPreferida) && TestarPorta(portaPreferida))
+            return;
+
+        string[] portas = SerialPort.GetPortNames();
+        foreach (string nomePorta in portas)
+        {
+            if (nomePorta == portaPreferida) continue; // ja tentou essa acima
+            if (TestarPorta(nomePorta))
+                return;
+        }
+
+        Debug.LogWarning("[Teensy] Nenhuma porta USB respondeu como o Teensy do totem. Vai tentar de novo em " + intervaloReconexao + "s.");
+    }
+
+    // Abre a porta, manda PING e so aceita como valida se vier PONG de volta.
+    // Isso evita conectar em qualquer outro dispositivo serial que esteja no PC.
+    private bool TestarPorta(string nomePorta)
+    {
+        SerialPort tentativa = null;
         try
         {
-            porta = new SerialPort(portaSerial, baudRate);
-            porta.ReadTimeout = 50;
-            porta.NewLine = "\n";
-            porta.Open();
-            conectado = true;
-            Debug.Log("[Teensy] Conectado na porta " + portaSerial);
+            tentativa = new SerialPort(nomePorta, baudRate);
+            tentativa.ReadTimeout = timeoutHandshakeMs;
+            tentativa.WriteTimeout = timeoutHandshakeMs;
+            tentativa.NewLine = "\n";
+            tentativa.Open();
+
+            // Descarta qualquer lixo que ja tenha chegado (ex: "TOTEM04,READY" do boot)
+            tentativa.DiscardInBuffer();
+
+            tentativa.WriteLine("PING");
+
+            string resposta = tentativa.ReadLine(); // pode lancar TimeoutException se ninguem responder
+            resposta = resposta.Trim();
+
+            if (resposta == "PONG")
+            {
+                porta = tentativa;
+                conectado = true;
+                bufferLeitura = "";
+                Debug.Log("[Teensy] Encontrado e conectado na porta " + nomePorta);
+                return true;
+            }
+
+            tentativa.Close();
+            return false;
         }
-        catch (Exception e)
+        catch (Exception)
         {
-            conectado = false;
-            Debug.LogWarning("[Teensy] Falha ao abrir porta " + portaSerial + ": " + e.Message);
+            // Porta nao existe, esta em uso por outro programa, nao respondeu a tempo, etc.
+            // Nao e erro real, so significa "nao e essa porta" — ignora e tenta a proxima.
+            if (tentativa != null && tentativa.IsOpen) tentativa.Close();
+            return false;
         }
     }
 
@@ -90,17 +159,25 @@ public class TeensyButtonManager : MonoBehaviour
         {
             while (porta.BytesToRead > 0)
             {
-                string linha = porta.ReadLine();
-                ProcessarLinha(linha);
+                int b = porta.ReadByte();
+                if (b == -1) break;
+
+                char c = (char)b;
+                if (c == '\n')
+                {
+                    ProcessarLinha(bufferLeitura);
+                    bufferLeitura = "";
+                }
+                else if (c != '\r')
+                {
+                    bufferLeitura += c;
+                }
             }
-        }
-        catch (TimeoutException)
-        {
-            // normal quando nao ha dados novos, pode ignorar
         }
         catch (Exception e)
         {
-            Debug.LogWarning("[Teensy] Erro lendo serial: " + e.Message);
+            Debug.LogWarning("[Teensy] Conexao perdida (" + e.Message + "). Vai tentar reconectar.");
+            FecharConexao();
         }
     }
 
@@ -166,7 +243,7 @@ public class TeensyButtonManager : MonoBehaviour
 
     /// <summary>
     /// Apaga todos os LEDs e devolve o controle de feedback local pro Teensy
-    /// (ou seja, volta a acender sozinho quando o botao fisico e apertado).
+    /// (ou seja, volta a acender/apagar sozinho quando o botao fisico e apertado).
     /// </summary>
     public void ApagarTodosLeds()
     {
@@ -199,9 +276,11 @@ public class TeensyButtonManager : MonoBehaviour
 
     private void FecharConexao()
     {
-        if (porta != null && porta.IsOpen)
+        conectado = false;
+        if (porta != null)
         {
-            porta.Close();
+            try { if (porta.IsOpen) porta.Close(); } catch { }
+            porta = null;
         }
     }
 }
