@@ -65,22 +65,15 @@ public class game : MonoBehaviour
     [Tooltip("Tempo (segundos) que cada botão fica aceso ou apagado em cada pisca — não é o ciclo completo.")]
     [SerializeField] private float duracaoPiscaErro = 0.2f;
 
-    [Header("Posição da bola (unidades de mundo, iguais às do fundo/IconePlay — não é fração de tela)")]
-    [Tooltip("Esse texto é criado em tempo de execução, então não dá pra arrastar no Scene view. Ajuste os valores aqui e aperte Play pra conferir. (0,0) é o centro da bola no meio do fundo.")]
-    [SerializeField] private Vector2 posicaoPlacar = new Vector2(0f, 0f);
-
-    [Header("Tamanho do texto (unidades de mundo)")]
-    [SerializeField] private float tamanhoPlacar = 0.12f;
+    [Header("Placar")]
     [Tooltip("Largura máxima que o texto da bola pode ocupar (unidades de mundo) — se \"VAI!\" ou algo maior que um dígito não couber nesse espaço, ele encolhe automaticamente pra caber dentro da bola")]
     [SerializeField] private float larguraMaximaPlacar = 1.1f;
-
-    [Header("Fonte da bola")]
-    [Tooltip("Nome de uma fonte instalada no Windows (ex: Arial Black, Impact, Verdana, Consolas). Se não achar, usa a fonte padrão do Unity")]
-    [SerializeField] private string nomeFonte = "Arial Black";
 
     [Header("Referências de cena")]
     [Tooltip("Arraste aqui o objeto de texto (TextMesh) que mostra a palavra da categoria embaixo. Assim dá pra posicionar ele arrastando no Scene view, do jeito que quiser.")]
     [SerializeField] private TextMesh txtPalavra;
+    [Tooltip("Arraste aqui o objeto de texto (TextMesh) que mostra o número/placar dentro da bola. Controla fonte, tamanho e posição direto no Inspector/Scene view, igual o Txt Palavra.")]
+    [SerializeField] private TextMesh txtPlacar;
 
     private static readonly string[] PalavrasVermelho = { "TRABALHO", "REALIZAÇÃO" };
 
@@ -89,8 +82,6 @@ public class game : MonoBehaviour
     private Dictionary<Cor, AudioClip> sons;
     private int indiceVermelho;
 
-    private Font fonte;
-    private TextMesh txtPlacar; // mostra a contagem regressiva no início e, depois, os acertos
     private AudioSource audioSource;
 
     private readonly List<Cor> sequencia = new List<Cor>();
@@ -103,6 +94,8 @@ public class game : MonoBehaviour
     {
         if (txtPalavra == null)
             Debug.LogError("game: arraste o objeto de texto da palavra pro campo 'Txt Palavra' no Inspector.");
+        if (txtPlacar == null)
+            Debug.LogError("game: arraste o objeto de texto do placar pro campo 'Txt Placar' no Inspector.");
 
         teclas = new Dictionary<KeyCode, Cor>
         {
@@ -145,7 +138,6 @@ public class game : MonoBehaviour
             }
         }
 
-        CriarUI();
         StartCoroutine(RodarJogo());
     }
 
@@ -435,37 +427,4 @@ public class game : MonoBehaviour
         TeensyButtonManager.Instance.SetLed(CorBotao.Azul, ligado);
     }
 
-    // Tudo aqui é criado em espaço de mundo comum (sem rotação própria), igual ao Background/IconePlay —
-    // assim a câmera girada 90° (totem em pé) já deixa o texto na orientação certa junto com o resto da arte
-    private void CriarUI()
-    {
-        fonte = Font.CreateDynamicFontFromOSFont(nomeFonte, 48);
-        if (fonte == null)
-            fonte = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-
-        txtPlacar = CriarTexto("Placar", posicaoPlacar, tamanhoPlacar, new Color(1f, 0.85f, 0.35f));
-    }
-
-    private TextMesh CriarTexto(string nomeObjeto, Vector2 posicaoMundo, float tamanhoCaractere, Color cor)
-    {
-        var go = new GameObject(nomeObjeto);
-        go.transform.SetParent(transform, false);
-        go.transform.localPosition = new Vector3(posicaoMundo.x, posicaoMundo.y, 0f);
-
-        var tm = go.AddComponent<TextMesh>();
-        tm.font = fonte;
-        tm.characterSize = tamanhoCaractere;
-        tm.fontSize = 48;
-        tm.fontStyle = FontStyle.Bold;
-        tm.anchor = TextAnchor.MiddleCenter;
-        tm.alignment = TextAlignment.Center;
-        tm.color = cor;
-        tm.text = "";
-
-        var mr = go.GetComponent<MeshRenderer>();
-        mr.sortingOrder = 10;
-        mr.material = tm.font.material;
-
-        return tm;
-    }
 }

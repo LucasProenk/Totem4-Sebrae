@@ -14,8 +14,8 @@ public class animaçaobg : MonoBehaviour
     [SerializeField] private int quantidade = 50;
     [SerializeField] private float velocidadeMin = 0.8f;
     [SerializeField] private float velocidadeMax = 1.8f;
-    [SerializeField] private float tamanhoMin = 0.04f;
-    [SerializeField] private float tamanhoMax = 0.14f;
+    [SerializeField] private float tamanhoMin = 0.0006f;
+    [SerializeField] private float tamanhoMax = 0.0015f;
     [Range(0f, 1f)]
     [SerializeField] private float espalhamentoCanto = 0.5f; // 0 = mira exatamente no canto, 1 = espalha por todo o quadrante
     [SerializeField] private float espalhamentoLateral = 0.6f; // o quanto ela "abre" pros lados enquanto viaja
@@ -193,8 +193,7 @@ public class animaçaobg : MonoBehaviour
         p.sr.color = new Color(p.corBase.r, p.corBase.g, p.corBase.b, 0f);
     }
 
-    // Gera um sprite de estrela/faísca (núcleo brilhante + raios em cruz), tipo constelação —
-    // igual às estrelinhas que já aparecem perto da lua na arte, sem depender de textura externa
+    // Gera um sprite de bolinha simples (círculo com borda suave), sem depender de textura externa
     private Sprite CriarSpriteBrilho()
     {
         const int tam = 96;
@@ -211,14 +210,7 @@ public class animaçaobg : MonoBehaviour
                 float ny = (y - centro.y) / raioMax;
                 float dist = Mathf.Sqrt(nx * nx + ny * ny);
 
-                // núcleo redondo e concentrado
-                float nucleo = Mathf.Pow(Mathf.Clamp01(1f - dist * 1.4f), 3f);
-
-                // raios finos em cruz, mais fortes perto do centro e desvanecendo nas pontas
-                float raioH = Mathf.Pow(Mathf.Clamp01(1f - Mathf.Abs(ny) * 9f), 2f) * Mathf.Pow(Mathf.Clamp01(1f - Mathf.Abs(nx)), 1.5f);
-                float raioV = Mathf.Pow(Mathf.Clamp01(1f - Mathf.Abs(nx) * 9f), 2f) * Mathf.Pow(Mathf.Clamp01(1f - Mathf.Abs(ny)), 1.5f);
-
-                float alpha = Mathf.Clamp01(nucleo + (raioH + raioV) * 0.9f);
+                float alpha = Mathf.Clamp01(1f - dist * 1.05f);
                 tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
             }
         }
