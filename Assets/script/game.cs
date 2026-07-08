@@ -74,6 +74,8 @@ public class game : MonoBehaviour
     [SerializeField] private TextMesh txtPalavra;
     [Tooltip("Arraste aqui o objeto de texto (TextMesh) que mostra o número/placar dentro da bola. Controla fonte, tamanho e posição direto no Inspector/Scene view, igual o Txt Palavra.")]
     [SerializeField] private TextMesh txtPlacar;
+    [Tooltip("Opcional: cópia do texto atrás do placar (maior e translúcida) que cria o efeito de glow leve. Deixe vazio se não quiser o glow.")]
+    [SerializeField] private TextMesh txtPlacarGlow;
 
     private static readonly string[] PalavrasVermelho = { "TRABALHO", "REALIZAÇÃO" };
 
@@ -379,6 +381,10 @@ public class game : MonoBehaviour
             float escala = larguraMaximaPlacar / largura;
             txtPlacar.transform.localScale = new Vector3(escala, escala, 1f);
         }
+
+        // o glow é filho do placar, então já herda a posição/escala — só precisa copiar o texto
+        if (txtPlacarGlow != null)
+            txtPlacarGlow.text = texto;
     }
 
     private IEnumerator ErroEIrParaFraseFinal()
