@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using TMPro;
 
 public class game : MonoBehaviour
 {
@@ -65,17 +66,11 @@ public class game : MonoBehaviour
     [Tooltip("Tempo (segundos) que cada botão fica aceso ou apagado em cada pisca — não é o ciclo completo.")]
     [SerializeField] private float duracaoPiscaErro = 0.2f;
 
-    [Header("Placar")]
-    [Tooltip("Largura máxima que o texto da bola pode ocupar (unidades de mundo) — se \"VAI!\" ou algo maior que um dígito não couber nesse espaço, ele encolhe automaticamente pra caber dentro da bola")]
-    [SerializeField] private float larguraMaximaPlacar = 1.1f;
-
     [Header("Referências de cena")]
     [Tooltip("Arraste aqui o objeto de texto (TextMesh) que mostra a palavra da categoria embaixo. Assim dá pra posicionar ele arrastando no Scene view, do jeito que quiser.")]
     [SerializeField] private TextMesh txtPalavra;
-    [Tooltip("Arraste aqui o objeto de texto (TextMesh) que mostra o número/placar dentro da bola. Controla fonte, tamanho e posição direto no Inspector/Scene view, igual o Txt Palavra.")]
-    [SerializeField] private TextMesh txtPlacar;
-    [Tooltip("Opcional: cópia do texto atrás do placar (maior e translúcida) que cria o efeito de glow leve. Deixe vazio se não quiser o glow.")]
-    [SerializeField] private TextMesh txtPlacarGlow;
+    [Tooltip("Arraste aqui o objeto TextMeshPro (dentro do Canvas) que mostra o número/placar e a contagem regressiva. Controla fonte, tamanho e posição direto no Inspector/Scene view.")]
+    [SerializeField] private TextMeshProUGUI txtPlacar;
 
     private static readonly string[] PalavrasVermelho = { "TRABALHO", "REALIZAÇÃO" };
 
@@ -369,22 +364,9 @@ public class game : MonoBehaviour
 
     private void AtualizarPlacar() => DefinirTextoPlacar(acertos.ToString());
 
-    // Se o texto (ex: "VAI!") for mais largo que a bola, encolhe até caber
     private void DefinirTextoPlacar(string texto)
     {
-        txtPlacar.transform.localScale = Vector3.one;
         txtPlacar.text = texto;
-
-        float largura = txtPlacar.GetComponent<MeshRenderer>().bounds.size.x;
-        if (largura > larguraMaximaPlacar && largura > 0f)
-        {
-            float escala = larguraMaximaPlacar / largura;
-            txtPlacar.transform.localScale = new Vector3(escala, escala, 1f);
-        }
-
-        // o glow é filho do placar, então já herda a posição/escala — só precisa copiar o texto
-        if (txtPlacarGlow != null)
-            txtPlacarGlow.text = texto;
     }
 
     private IEnumerator ErroEIrParaFraseFinal()
