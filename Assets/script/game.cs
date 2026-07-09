@@ -45,6 +45,10 @@ public class game : MonoBehaviour
     [Tooltip("Arraste aqui o áudio que toca quando o jogador erra (ou fica parado sem clicar)")]
     [SerializeField] private AudioClip somErro;
 
+    [Header("Feedback ao apertar o botão (na sua vez)")]
+    [Tooltip("Quanto tempo o LED fica aceso quando você aperta um botão na sua vez, antes de apagar de novo (efeito de flash).")]
+    [SerializeField] private float duracaoFlashBotao = 0.15f;
+
     [Header("Tempos (segundos)")]
     [SerializeField] private int duracaoContagem = 5;
     [SerializeField] private float tempoMostrandoCor = 0.8f;
@@ -298,6 +302,14 @@ public class game : MonoBehaviour
         }
     }
 
+    // Acende o LED do botão apertado e apaga de novo pouco depois, dando o efeito de "flash"
+    private IEnumerator FlashLed(CorBotao botao)
+    {
+        TeensyButtonManager.Instance.SetLed(botao, true);
+        yield return new WaitForSeconds(duracaoFlashBotao);
+        TeensyButtonManager.Instance.SetLed(botao, false);
+    }
+
     // Toca o som daquela cor, se tiver algum clip arrastado no Inspector pra ela
     private void TocarSomDaCor(Cor cor)
     {
@@ -348,6 +360,11 @@ public class game : MonoBehaviour
 
     private void ReceberInput(Cor corDigitada)
     {
+        // Feedback imediato do botão que você acabou de apertar: pisca o LED (acende e apaga) e toca o som dele
+        TocarSomDaCor(corDigitada);
+        if (usarBotoesFisicos && TeensyButtonManager.Instance != null)
+            StartCoroutine(FlashLed(ConverterCorParaBotao(corDigitada)));
+
         if (corDigitada == sequencia[indiceEsperado])
         {
             acertos++;
